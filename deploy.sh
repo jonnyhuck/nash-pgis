@@ -30,7 +30,7 @@
 
 set -euo pipefail
 
-SRC="${NASH_SRC:-/var/www/staging/nash-pgis}"
+SRC="${NASH_SRC:-/var/www/stage/nash-pgis}"
 DEST="${NASH_DEST:-/var/www/html/nash.huckg.is}"
 BACKUP_DIR="${NASH_BACKUPS:-/var/backups/nash.huckg.is}"
 
