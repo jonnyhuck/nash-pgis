@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ticks Mapping Survey &mdash; Field Setup</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a3f6f">
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+</head>
+<body>
+<div class="page-container">
+
+    <header class="site-header">
+        <p class="institution">Field team only</p>
+        <h1 class="site-title">Offline Setup &amp; Upload Status</h1>
+    </header>
+
+    <main class="content">
+
+        <!-- ── 1. Device readiness ── -->
+        <div class="card">
+            <h2>1. This device</h2>
+            <p>Open this page <strong>with a good connection</strong> on every phone before going into the field. Every line below should show a tick.</p>
+            <ul class="check-list" id="checks">
+                <li id="chk-secure">Checking&hellip;</li>
+                <li id="chk-offline">Checking&hellip;</li>
+                <li id="chk-persist">Checking&hellip;</li>
+                <li id="chk-storage">Checking&hellip;</li>
+            </ul>
+            <button class="btn btn-secondary btn-small" id="persist-btn" onclick="askPersist()">Protect stored data</button>
+        </div>
+
+        <!-- ── 2. Map download ── -->
+        <div class="card">
+            <h2>2. Download the map</h2>
+            <p>The map below opens on the study area (outlined in yellow). Choose how detailed the download should be and press Download: everything on screen is saved at every zoom level up to the level chosen. To cover extra areas participants may need, move or zoom the map and download again.</p>
+
+            <div id="map" class="setup-map"></div>
+            <div class="button-row">
+                <button class="btn btn-secondary btn-small" onclick="resetToBoundary()">&#8635; Back to study area</button>
+            </div>
+
+            <div class="form-group" style="margin-top:0.9rem;">
+                <label class="field-label" for="max-zoom">Most detailed zoom level to download</label>
+                <select id="max-zoom"></select>
+            </div>
+            <p class="estimate" id="estimate">&nbsp;</p>
+
+            <div class="dl-bar hidden" id="dl-bar"><div class="dl-fill" id="dl-fill"></div></div>
+            <p class="estimate" id="dl-status"></p>
+
+            <div class="button-row">
+                <button class="btn btn-primary" id="dl-btn" onclick="startDownload()">Download this area</button>
+                <button class="btn btn-secondary hidden" id="cancel-btn" onclick="cancelDownload()">Stop</button>
+            </div>
+            <div class="button-row">
+                <button class="btn btn-secondary btn-small" onclick="deleteTiles()">Delete downloaded map</button>
+            </div>
+        </div>
+
+        <!-- ── 3. Survey data ── -->
+        <div class="card">
+            <h2>3. Survey answers on this device</h2>
+            <p class="sync-status sync-status-block" id="sync-status"></p>
+            <ul class="check-list" id="data-detail"></ul>
+
+            <div class="button-row">
+                <button class="btn btn-primary" onclick="uploadNow()">Upload now</button>
+            </div>
+
+            <p style="margin-top:1rem;">If a phone will not get signal before it has to be reset or handed back, save a backup file and copy it to another device (or email it once you have signal). Loading that file on any phone with this survey queues the answers for upload from there. Loading a file twice is harmless.</p>
+            <div class="button-row">
+                <button class="btn btn-secondary btn-small" onclick="saveBackup()">Save backup file</button>
+                <label class="btn btn-secondary btn-small file-btn">
+                    Load backup file
+                    <input type="file" accept="application/json,.json" id="backup-input" onchange="loadBackup(this)">
+                </label>
+            </div>
+            <div class="button-row">
+                <button class="btn btn-secondary btn-small" onclick="retryRejected()">Retry rejected answers</button>
+            </div>
+        </div>
+
+    </main>
+
+    <div class="nav-buttons end">
+        <a class="btn btn-primary" href="index.html">Go to survey &rarr;</a>
+    </div>
+
+</div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="config.js"></script>
+<script src="outbox.js"></script>
+
+<script type="module">
+    import { requestPersistence, requestSync, refreshSyncStatus, outboxCounts } from './api.js';
+    import { addBoundary } from './boundary.js';
+
+    const C = window.SURVEY_CONFIG;
+    const Outbox = window.Outbox;
+
+    // Rough average size of one satellite tile, for the estimate only. Real
+    // tiles range from a few KB (bare ground) to ~40 KB (busy detail).
+    const AVG_TILE_KB = 20;
+
+    // A single download larger than this is refused: it would take hours and
+    // most of the phone's storage, and is almost certainly a mistake.
+    const MAX_TILES = 150000;
+
+    // How many tiles to fetch at once. Enough to use a good connection well,
+    // few enough not to be rate-limited.
+    const CONCURRENCY = 6;
+
+
+    /* ════════════════════════════════════════════════════════════════
+       1. DEVICE READINESS
+       ════════════════════════════════════════════════════════════════ */
+
+    function mark(id, ok, text) {
+        const el = document.getElementById(id);
+        el.dataset.ok = ok ? 'yes' : 'no';
+        el.textContent = (ok ? '✓ ' : '✗ ') + text;
+    }
+
+    const mb = bytes => (bytes / 1048576).toFixed(0) + ' MB';
+
+    async function runChecks() {
+        mark('chk-secure', window.isSecureContext,
+             window.isSecureContext ? 'Secure connection (HTTPS)'
+                                    : 'Not HTTPS — offline mode cannot work on this address');
+
+        // The page is controlled by the service worker, and the app files are stored.
+        let shellOk = false;
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            const keys = await caches.keys();
+            for (const k of keys.filter(k => k.startsWith('ticks-shell-'))) {
+                if (await (await caches.open(k)).match('map2.html')) shellOk = true;
+            }
+        }
+        mark('chk-offline', shellOk,
+             shellOk ? 'Survey saved for offline use'
+                     : 'Survey not yet saved for offline use — reload this page with a connection');
+
+        const persisted = navigator.storage && navigator.storage.persisted
+            ? await navigator.storage.persisted() : false;
+        mark('chk-persist', persisted,
+             persisted ? 'Stored data protected from automatic clearing'
+                       : 'Stored data could be cleared if the phone runs low on space — tap below');
+        document.getElementById('persist-btn').classList.toggle('hidden', persisted);
+
+        if (navigator.storage && navigator.storage.estimate) {
+            const { usage, quota } = await navigator.storage.estimate();
+            mark('chk-storage', quota - usage > 200 * 1048576,
+                 `Storage: ${mb(usage)} used, about ${mb(quota - usage)} free for this survey`);
+        } else {
+            mark('chk-storage', true, 'Storage: size not reported by this browser');
+        }
+    }
+
+    window.askPersist = async () => {
+        const granted = await requestPersistence();
+        if (!granted) {
+            alert('The browser declined. On Android Chrome, adding this survey to the ' +
+                  'home screen (menu → "Add to Home screen") usually allows it; then try again.');
+        }
+        runChecks();
+    };
+
+
+    /* ════════════════════════════════════════════════════════════════
+       2. MAP DOWNLOAD
+       ════════════════════════════════════════════════════════════════ */
+
+    // No starting view: addBoundary() at the end of this section zooms to
+    // the study area, exactly as the survey's own maps open.
+    const map = L.map('map', { maxZoom: C.MAX_ZOOM });
+
+    // The same layer as the survey, so browsing here also caches what is seen.
+    L.tileLayer(C.TILE_URL, {
+        subdomains: C.TILE_SUBDOMAINS, attribution: 'Imagery &copy; Google',
+        maxZoom: C.MAX_ZOOM, crossOrigin: true
+    }).addTo(map);
+
+    // Standard Web Mercator tile maths.
+    const lon2x = (lon, z) => Math.floor((lon + 180) / 360 * 2 ** z);
+    const lat2y = (lat, z) => {
+        const r = lat * Math.PI / 180;
+        return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z);
+    };
+
+    /**
+     * The x/y tile ranges covering the current view, at every zoom from 0 up
+     * to maxZ. The wide levels cost only a handful of tiles, and mean a
+     * participant who zooms out offline still sees where they are.
+     */
+    function tileRanges(maxZ) {
+        const b = map.getBounds();
+        const ranges = [];
+        for (let z = 0; z <= maxZ; z++) {
+            const n = 2 ** z - 1;
+            const x0 = Math.max(0, lon2x(b.getWest(), z)), x1 = Math.min(n, lon2x(b.getEast(), z));
+            const y0 = Math.max(0, lat2y(b.getNorth(), z)), y1 = Math.min(n, lat2y(b.getSouth(), z));
+            ranges.push({ z, x0, x1, y0, y1, count: (x1 - x0 + 1) * (y1 - y0 + 1) });
+        }
+        return ranges;
+    }
+
+    const zoomSelect = document.getElementById('max-zoom');
+
+    /** Rebuild the zoom choices: the current view's zoom up to the maximum. */
+    function refreshZoomOptions() {
+        const prev = parseInt(zoomSelect.value, 10);
+        const from = map.getZoom();
+        zoomSelect.innerHTML = '';
+        for (let z = from; z <= C.MAX_ZOOM; z++) {
+            const o = document.createElement('option');
+            o.value = z;
+            o.textContent = `Level ${z}` + (z === from ? ' (as on screen now)' : ` (${2 ** (z - from)}× closer)`);
+            zoomSelect.appendChild(o);
+        }
+        // Keep the previous choice if still offered, otherwise default to a
+        // level detailed enough to recognise individual features.
+        const fallback = Math.min(C.MAX_ZOOM, Math.max(from, 16));
+        zoomSelect.value = (prev >= from && prev <= C.MAX_ZOOM) ? prev : fallback;
+        refreshEstimate();
+    }
+
+    function refreshEstimate() {
+        const total = tileRanges(parseInt(zoomSelect.value, 10)).reduce((s, r) => s + r.count, 0);
+        const size  = total * AVG_TILE_KB / 1024;
+        const sizeText = size >= 1024 ? (size / 1024).toFixed(1) + ' GB' : Math.ceil(size) + ' MB';
+        document.getElementById('estimate').textContent =
+            `${total.toLocaleString()} tiles, roughly ${sizeText}` +
+            (total > MAX_TILES ? ' — too large: zoom the map in, or choose a lower level' : '');
+        document.getElementById('dl-btn').disabled = total > MAX_TILES || downloading;
+    }
+
+    map.on('moveend zoomend', refreshZoomOptions);
+    zoomSelect.addEventListener('change', refreshEstimate);
+
+    let downloading = false;
+    let cancelled   = false;
+
+    window.startDownload = async () => {
+        const ranges = tileRanges(parseInt(zoomSelect.value, 10));
+        const total  = ranges.reduce((s, r) => s + r.count, 0);
+        if (total > MAX_TILES) return;
+
+        downloading = true;
+        cancelled   = false;
+        document.getElementById('dl-btn').disabled = true;
+        document.getElementById('cancel-btn').classList.remove('hidden');
+        document.getElementById('dl-bar').classList.remove('hidden');
+
+        // Keep the screen on, or the phone sleeping halfway through stops the download.
+        let wakeLock = null;
+        try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* optional */ }
+
+        const cache = await caches.open(C.TILE_CACHE);
+        let done = 0, fetched = 0, had = 0, failed = 0;
+
+        // Generated lazily, so even a large download never holds every tile in memory.
+        function* tiles() {
+            for (const r of ranges)
+                for (let x = r.x0; x <= r.x1; x++)
+                    for (let y = r.y0; y <= r.y1; y++) yield [x, y, r.z];
+        }
+        const it = tiles();
+
+        const status = document.getElementById('dl-status');
+        const fill   = document.getElementById('dl-fill');
+        const show = () => {
+            fill.style.width = (100 * done / total) + '%';
+            status.textContent = `${done.toLocaleString()} of ${total.toLocaleString()} ` +
+                `(${had.toLocaleString()} already saved, ${fetched.toLocaleString()} downloaded` +
+                (failed ? `, ${failed.toLocaleString()} failed` : '') + ')';
+        };
+
+        async function getTile(x, y, z) {
+            const key = C.tileKey(x, y, z);
+            if (await cache.match(key)) { had++; return; }
+
+            // One retry, since a single dropped request on a patchy
+            // connection should not leave a hole in the map.
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    const res = await fetch(C.tileFetchUrl(x, y, z), { mode: 'cors', credentials: 'omit' });
+                    if (res.ok) { await cache.put(key, res); fetched++; return; }
+                    // 404 means Google has no imagery there; retrying will not help.
+                    if (res.status === 404) break;
+                } catch (e) { /* network hiccup: retry */ }
+            }
+            failed++;
+        }
+
+        async function worker() {
+            for (let next = it.next(); !next.done && !cancelled; next = it.next()) {
+                await getTile(...next.value);
+                done++;
+                if (done % 20 === 0) show();
+            }
+        }
+
+        let stopError = null;
+        try {
+            await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+        } catch (e) {
+            // Most likely the storage quota. The other workers see the flag
+            // and stop at their next tile.
+            stopError = e;
+            cancelled = true;
+        }
+
+        show();
+        if (stopError) status.textContent += ` — stopped: ${stopError.message} (is the phone's storage full?)`;
+        else if (cancelled) status.textContent += ' — stopped.';
+        else if (failed) status.textContent += ' — press Download again to retry the failed tiles.';
+        else status.textContent += ' — complete.';
+
+        if (wakeLock) wakeLock.release().catch(() => {});
+        downloading = false;
+        document.getElementById('cancel-btn').classList.add('hidden');
+        refreshEstimate();
+        runChecks();
+    };
+
+    window.cancelDownload = () => { cancelled = true; };
+
+    window.deleteTiles = async () => {
+        if (!confirm('Delete all downloaded map imagery from this phone? Survey answers are not affected.')) return;
+        await caches.delete(C.TILE_CACHE);
+        document.getElementById('dl-status').textContent = 'Downloaded map deleted.';
+        runChecks();
+    };
+
+    // Zooming to the boundary fires moveend, which fills in the zoom choices.
+    window.resetToBoundary = () => {};
+    addBoundary(map).then(reset => { window.resetToBoundary = reset; });
+
+
+    /* ════════════════════════════════════════════════════════════════
+       3. SURVEY DATA
+       ════════════════════════════════════════════════════════════════ */
+
+    const when = ms => ms ? new Date(ms).toLocaleString() : 'never';
+
+    async function refreshData() {
+        const c = await outboxCounts();
+        const m = await Outbox.getMeta();
+        const list = document.getElementById('data-detail');
+        list.innerHTML = '';
+        [
+            `Waiting to upload: ${c.pending}`,
+            `Rejected by the server: ${c.failed}`,
+            `Last successful upload: ${when(m.lastSuccessAt)}`,
+            m.lastError ? `Last problem: ${m.lastError} (${when(m.lastErrorAt)})` : null
+        ].filter(Boolean).forEach(t => {
+            const li = document.createElement('li');
+            li.textContent = t;
+            list.appendChild(li);
+        });
+        refreshSyncStatus();
+    }
+
+    window.uploadNow = async () => {
+        requestSync(0);
+        setTimeout(refreshData, 1500);
+    };
+
+    window.saveBackup = async () => {
+        const data = await Outbox.exportBackup();
+        const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `ticks-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    };
+
+    window.loadBackup = async (input) => {
+        const file = input.files[0];
+        input.value = '';
+        if (!file) return;
+        try {
+            const n = await Outbox.importBackup(JSON.parse(await file.text()));
+            alert(`${n} answers queued for upload from this phone.`);
+            requestSync(0);
+        } catch (e) {
+            alert('Could not load that file: ' + e.message);
+        }
+        refreshData();
+    };
+
+    window.retryRejected = async () => {
+        const n = await Outbox.retryFailed();
+        alert(n ? `${n} answers queued to try again.` : 'Nothing to retry.');
+        requestSync(0);
+        refreshData();
+    };
+
+    setInterval(refreshData, 3000);
+    refreshData();
+    runChecks();
+
+    // The first visit installs the service worker; re-check once it takes over.
+    if (navigator.serviceWorker) {
+        navigator.serviceWorker.addEventListener('controllerchange', runChecks);
+    }
+</script>
+</body>
+</html>

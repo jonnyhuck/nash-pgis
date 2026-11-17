@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ticks Mapping Survey &mdash; No Ticks</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a3f6f">
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+</head>
+<body>
+<div class="page-container">
+
+    <div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+        <div class="progress-row">
+            <p class="sync-status" id="sync-status"></p>
+            <p class="progress-label">Page 3 of 3</p>
+        </div>
+    </div>
+
+    <!-- ── Question 2 ── -->
+    <div class="map-question no-ticks">
+        <h2>Please spray the areas where you do not find ticks.</h2>
+        <p class="question-note">You can add as many separate areas as you like &mdash; press &ldquo;Spray again&rdquo; after each one.</p>
+    </div>
+
+    <p class="instructions">
+        Use <strong>+&thinsp;/&thinsp;&minus;</strong> or pinch to zoom; drag one finger to move the map.<br><br>
+        Tap <strong>NO TICKS</strong> to pick up the spraycan, then hold and drag your finger to paint one area. Tap the button again to put the can down. When you are happy with it, press <strong>SPRAY AGAIN</strong> below to save it and start on another area, or press <strong>SUBMIT</strong> to save it and finish the survey. Leave the map blank if none of this applies to you.
+    </p>
+
+    <div class="map-toolbar">
+        <button class="tool-btn" onclick="undoSprayAndCheck()">&#8630; Undo</button>
+        <button class="tool-btn" onclick="clearSprayAndCheck()">&#x1F5D1; Clear all</button>
+        <button class="tool-btn" onclick="resetView()">&#8635; Reset map</button>
+    </div>
+
+    <div class="map-wrap">
+        <div id="map"></div>
+    </div>
+
+    <div class="draw-modes">
+        <button class="draw-btn btn-draw-no_ticks" id="btn-no_ticks" onclick="selectColour('no_ticks')">
+            <span class="draw-label"><span class="swatch"></span>NO TICKS</span>
+        </button>
+    </div>
+
+    <p class="places-count" id="places-count">No areas added yet</p>
+
+    <div class="nav-buttons nav-buttons-3">
+        <button class="btn btn-secondary" onclick="goBack()">&larr; PREV</button>
+        <button class="btn btn-secondary" id="spray-again-btn" onclick="requestSprayAgain()" disabled>SPRAY AGAIN</button>
+        <button class="btn btn-primary" id="next-btn" onclick="requestNext()">SUBMIT</button>
+    </div>
+
+</div><!-- /.page-container -->
+
+<!-- ── Follow-up sheet ── -->
+<div id="form-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeModal()">
+    <div class="modal-sheet">
+        <h3 class="modal-title">Tell us about this area&hellip;</h3>
+
+        <div class="form-group">
+            <label class="field-label">Please select one:</label>
+            <div class="option-group modal-radio-group" data-field="trend" data-required="true">
+                <label class="option-row"><input type="radio" name="trend" value="always_few"><span>There were few or no ticks here as long as I can remember</span></label>
+                <label class="option-row"><input type="radio" name="trend" value="used_more"><span>There used to be more ticks here</span></label>
+                <label class="option-row"><input type="radio" name="trend" value="used_fewer"><span>There used to be fewer ticks here</span></label>
+                <label class="option-row"><input type="radio" name="trend" value="dont_know"><span>I don&rsquo;t know</span></label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="field-label">How confident are you on this answer? (0&ndash;10)</label>
+            <div class="scale-options modal-radio-group" data-field="confidence" data-type="int" data-required="true">
+                <label class="scale-option"><input type="radio" name="confidence" value="0"><span>0</span></label>
+                <label class="scale-option"><input type="radio" name="confidence" value="1"><span>1</span></label>
+                <label class="scale-option"><input type="radio" name="confidence" value="2"><span>2</span></label>
+                <label class="scale-option"><input type="radio" name="confidence" value="3"><span>3</span></label>
+                <label class="scale-option"><input type="radio" name="confidence" value="4"><span>4</span></label>
+                <label class="scale-option"><input type="radio" name="confidence" value="5"><span>5</span></label>
+                <label class="scale-option"><input type="radio" name="confidence" value="6"><span>6</span></label>
+                <label class="scale-option"><input type="radio" name="confidence" value="7"><span>7</span></label>
+                <label class="scale-option"><input type="radio" name="confidence" value="8"><span>8</span></label>
+                <label class="scale-option"><input type="radio" name="confidence" value="9"><span>9</span></label>
+                <label class="scale-option"><input type="radio" name="confidence" value="10"><span>10</span></label>
+            </div>
+            <div class="scale-endpoints"><span>Not at all confident</span><span>Completely confident</span></div>
+        </div>
+
+        <div class="nav-buttons" style="margin-top:0.9rem;padding:0;">
+            <button class="btn btn-secondary" onclick="closeModal()">&larr; Back to map</button>
+            <button class="btn btn-primary" id="modal-confirm-btn" onclick="confirmModal()" disabled>Save</button>
+        </div>
+    </div>
+</div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="config.js"></script>
+<script src="outbox.js"></script>
+
+<script>
+    window.PAGE_CONFIG = {
+        question: 'no_ticks',
+
+        // Blue: clearly distinct from the red of the "most ticks" map, so the
+        // two datasets never look alike when plotted side by side.
+        colours: { no_ticks: '#2563eb' },
+
+        prev:    'map1.html',
+
+        // The last page, so confirmModal()/proceed() also queue the submit.
+        next:    'thankyou.html',
+        isFinal: true
+    };
+</script>
+
+<script src="spray.js"></script>
+<script type="module" src="mappage.js"></script>
+</body>
+</html>

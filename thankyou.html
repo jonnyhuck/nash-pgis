@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ticks Mapping Survey &mdash; Thank You</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a3f6f">
+</head>
+<body>
+<div class="page-container">
+
+    <div id="thankyou-section">
+        <div class="card thankyou-card">
+            <div class="tick">&#10003;</div>
+            <h2>Thank you for your participation!</h2>
+            <p>Your responses have been recorded. This survey forms part of PhD research at the University of Manchester into where ticks are found across this landscape, and how that has changed over time.</p>
+            <p>Your anonymous contribution is greatly appreciated, and will help build a richer, more grounded picture of the landscape from the people who know it best.</p>
+
+            <!-- For the field team: whether this phone still holds answers that
+                 have not reached the server. Updated by api.js. -->
+            <p class="sync-status sync-status-block" id="sync-status"></p>
+
+            <!-- The way to hand a shared phone to the next participant. Safe
+                 even while uploads are waiting: each queued answer carries its
+                 own participant's session ID. -->
+            <p style="margin-top:1.2rem;">
+                <button class="btn btn-primary" onclick="startAgain()" style="width:100%;">
+                    &#8634; Start Again
+                </button>
+            </p>
+        </div>
+    </div>
+
+    <p class="setup-link"><a href="setup.html">Field team: offline setup &amp; upload status</a></p>
+
+</div><!-- /.page-container -->
+
+<script src="config.js"></script>
+<script src="outbox.js"></script>
+
+<script type="module">
+    // Imported for its side effects too: the service worker, the upload loop
+    // and the status line all start as soon as api.js loads.
+    import { clearSurveyLocal } from './api.js';
+
+    /* Pin the participant to this page. Pressing Back from here would land
+       them in the survey they have just completed, so an extra history entry
+       is seeded, and re-seeded every time one is consumed. "Start Again" is
+       unaffected, because it navigates forward rather than back. */
+    history.pushState(null, '', location.href);
+    window.addEventListener('popstate', () => history.pushState(null, '', location.href));
+
+    /** Wipe this browser's working copy of the response and return to the start. */
+    window.startAgain = function () {
+        /* The session ID is cleared as well as the answers, or the next
+           participant would write into this participant's database row.
+           The outbox is deliberately left alone: anything still waiting to
+           upload belongs to this participant and will still be sent. */
+        clearSurveyLocal();
+        window.location.href = 'index.html';
+    };
+</script>
+</body>
+</html>

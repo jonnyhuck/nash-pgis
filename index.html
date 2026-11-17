@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Mobile first: the survey is designed to be completed on a phone, so
+         the viewport is pinned to the device width from the outset. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ticks Mapping Survey</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a3f6f">
+</head>
+<body>
+<div class="page-container">
+
+    <header class="site-header">
+        <p class="institution">University of Manchester &mdash; PhD Research</p>
+        <h1 class="site-title">Ticks in the Landscape</h1>
+    </header>
+
+    <!-- Three steps in total: this page, then the two maps. -->
+    <div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" style="width:33%"></div></div>
+        <div class="progress-row">
+            <p class="sync-status" id="sync-status"></p>
+            <p class="progress-label">Page 1 of 3</p>
+        </div>
+    </div>
+
+    <main class="content">
+
+        <!-- ── Information sheet ── -->
+        <div class="card">
+            <h2>About This Research</h2>
+            <p>This research is being carried out as part of a <strong>PhD project</strong> at the University of Manchester. It aims to understand <strong>where ticks are found</strong> across this landscape, and how that has changed over time, using the knowledge of the people who live and keep livestock here.</p>
+            <p><strong>What does the survey involve?</strong> You will be asked a few questions about yourself, then invited to mark two maps: the areas where you find the most ticks, and the areas where you do not find ticks. You can mark as many separate areas as you like on each map. There are no right or wrong answers &mdash; this survey is about your own knowledge and experience.</p>
+            <p><strong>How long will it take?</strong> Around ten minutes.</p>
+            <p class="notice">All data collected is <strong>completely anonymous</strong>. No personally identifiable information is stored. You may stop participating at any time without consequence.</p>
+        </div>
+
+        <!-- ── Age ──
+             A number rather than brackets: many participants will know their
+             age only approximately, and an estimate in years is still more
+             useful to the analysis than a bracket would be. -->
+        <div class="card">
+            <h2>How old are you?</h2>
+            <div class="form-group">
+                <label class="field-label" for="age">Age in years (an estimate is fine)</label>
+                <input type="number" id="age" name="age" min="1" max="120" step="1" inputmode="numeric">
+            </div>
+        </div>
+
+        <!-- ── Education ── -->
+        <div class="card">
+            <h2>What is your highest level of education?</h2>
+            <div class="option-group" id="q-education">
+                <label class="option-row"><input type="radio" name="education" value="informal"><span>Informal</span></label>
+                <label class="option-row"><input type="radio" name="education" value="primary"><span>Primary</span></label>
+                <label class="option-row"><input type="radio" name="education" value="secondary"><span>Secondary</span></label>
+                <label class="option-row"><input type="radio" name="education" value="post_secondary"><span>Post-secondary</span></label>
+            </div>
+        </div>
+
+        <!-- ── Residence ──
+             The follow-up only appears on "Yes", and is only required then:
+             see the FOLLOW_UPS table in the script below. -->
+        <div class="card">
+            <h2>Do you currently live in this landscape?</h2>
+            <div class="option-group">
+                <label class="option-row"><input type="radio" name="livesHere" value="yes"><span>Yes</span></label>
+                <label class="option-row"><input type="radio" name="livesHere" value="no"><span>No</span></label>
+            </div>
+            <div class="follow-up hidden" id="livesHere-more">
+                <div class="form-group">
+                    <label class="field-label" for="livesYears">For how many years? (enter 0 if less than one year)</label>
+                    <input type="number" id="livesYears" name="livesYears" min="0" max="120" step="1" inputmode="numeric">
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Livestock ── -->
+        <div class="card">
+            <h2>Do you keep livestock in this landscape?</h2>
+            <div class="option-group">
+                <label class="option-row"><input type="radio" name="keepsLivestock" value="yes"><span>Yes</span></label>
+                <label class="option-row"><input type="radio" name="keepsLivestock" value="no"><span>No</span></label>
+            </div>
+            <div class="follow-up hidden" id="keepsLivestock-more">
+                <div class="form-group">
+                    <label class="field-label" for="livestockYears">For how many years? (enter 0 if less than one year)</label>
+                    <input type="number" id="livestockYears" name="livestockYears" min="0" max="120" step="1" inputmode="numeric">
+                </div>
+                <div class="form-group">
+                    <label class="field-label">What livestock do you keep? (select all that apply)</label>
+                    <div class="option-group" id="q-livestock">
+                        <label class="option-row"><input type="checkbox" name="livestock" value="sheep"><span>Sheep</span></label>
+                        <label class="option-row"><input type="checkbox" name="livestock" value="goats"><span>Goats</span></label>
+                        <label class="option-row"><input type="checkbox" name="livestock" value="cattle"><span>Cattle</span></label>
+                        <label class="option-row"><input type="checkbox" name="livestock" value="camel"><span>Camel</span></label>
+                        <label class="option-row"><input type="checkbox" name="livestock" value="other"><span>Other (e.g., donkey, poultry)</span></label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Consent ── -->
+        <div class="card">
+            <h2>Consent</h2>
+            <p>Before continuing, please read the following statement and confirm your consent.</p>
+            <label class="option-row consent-row">
+                <input type="checkbox" id="consent">
+                <span>I have read and understood the information above. I voluntarily consent to my anonymous responses being used for academic research purposes. I understand I can withdraw from the survey at any time by closing the browser.</span>
+            </label>
+        </div>
+
+    </main>
+
+    <!-- NEXT starts disabled and is unlocked once every question below has
+         an answer — see updateGate() in the script block. -->
+    <div class="nav-buttons end">
+        <button class="btn btn-primary" id="next-btn" onclick="goNext()" disabled>NEXT &rarr;</button>
+    </div>
+
+    <!-- For the field team: pre-downloading the map, and checking on data
+         that has not uploaded yet. -->
+    <p class="setup-link"><a href="setup.html">Field team: offline setup &amp; upload status</a></p>
+
+</div>
+
+<!-- Classic scripts first: api.js expects both globals to exist. -->
+<script src="config.js"></script>
+<script src="outbox.js"></script>
+
+<script type="module">
+    import { getOrCreateSessionId, startNewSession, saveMeta,
+             settleWithin, loadSurveyLocal, saveSurveyLocal } from './api.js';
+
+    /* Decide whether this is a genuinely new participant, or someone stepping
+       back to page 1 part-way through their own response.
+
+       This matters on a shared device. The session ID lives in localStorage and
+       is what every page writes under, so without an explicit reset a second
+       participant on the same phone would file their answers into the first
+       participant's database row and overwrite it. A fresh start is either no
+       consent recorded yet, or a previous response that has been submitted. */
+    const prev         = loadSurveyLocal();
+    const isFreshStart = !prev.consent || prev.submittedAt;
+
+    // Either way, this page must end up holding a valid session ID.
+    if (isFreshStart) startNewSession(); else getOrCreateSessionId();
+
+    /* Handed to the classic script below, which cannot import from a module
+       but does own the buttons and their onclick handlers. */
+    window.saveMeta        = saveMeta;
+    window.settleWithin    = settleWithin;
+    window.loadSurveyLocal = loadSurveyLocal;
+    window.saveSurveyLocal = saveSurveyLocal;
+</script>
+
+<script>
+    // Single-choice questions, always asked.
+    const RADIO_NAMES = ['education', 'livesHere', 'keepsLivestock'];
+
+    /* Questions that only appear, and are only required, after a "yes".
+       Keyed by the yes/no question that reveals them; each lists the number
+       fields and checkbox groups inside its follow-up block. */
+    const FOLLOW_UPS = {
+        livesHere:      { numbers: ['livesYears'],     checks: [] },
+        keepsLivestock: { numbers: ['livestockYears'], checks: ['livestock'] }
+    };
+
+    const consentBox = document.getElementById('consent');
+    const nextBtn    = document.getElementById('next-btn');
+
+    /** The selected value of a radio group, or null. */
+    const radioValue = name => {
+        const el = document.querySelector(`input[name="${name}"]:checked`);
+        return el ? el.value : null;
+    };
+
+    /** A whole number typed into a field, or null if blank or out of range. */
+    function numberValue(id) {
+        const el = document.getElementById(id);
+        if (el.value.trim() === '') return null;
+        const n = Number(el.value);
+        return (Number.isInteger(n) && n >= Number(el.min) && n <= Number(el.max)) ? n : null;
+    }
+
+    /** Every ticked value of a checkbox group, as an array. */
+    const checkValues = name =>
+        [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(cb => cb.value);
+
+    /** Show each follow-up block only while its question is answered "yes". */
+    function updateFollowUps() {
+        Object.keys(FOLLOW_UPS).forEach(q => {
+            document.getElementById(q + '-more').classList.toggle('hidden', radioValue(q) !== 'yes');
+        });
+    }
+
+    /**
+     * True once every question that is currently being asked has a valid
+     * answer: age, the three single-choice questions, and the follow-ups of
+     * any question answered "yes".
+     */
+    function allQuestionsAnswered() {
+        if (numberValue('age') === null) return false;
+        if (!RADIO_NAMES.every(radioValue)) return false;
+
+        return Object.entries(FOLLOW_UPS).every(([q, f]) =>
+            radioValue(q) !== 'yes' || (
+                f.numbers.every(id => numberValue(id) !== null) &&
+                f.checks.every(name => checkValues(name).length > 0)
+            )
+        );
+    }
+
+    /**
+     * Re-evaluate whether NEXT should be enabled. Both consent and a complete
+     * set of answers are required, since no later page gives a chance to come
+     * back and fill in a skipped question.
+     */
+    function updateGate() {
+        updateFollowUps();
+        nextBtn.disabled = !consentBox.checked || !allQuestionsAnswered();
+    }
+
+    // Delegated: one pair of listeners covers every control on the page.
+    document.querySelector('main').addEventListener('input',  updateGate);
+    document.querySelector('main').addEventListener('change', updateGate);
+
+    /* Pre-fill from the local copy, so a participant who steps back from the
+       first map finds their answers still here rather than a blank form. */
+    window.addEventListener('load', () => {
+        const d = window.loadSurveyLocal ? window.loadSurveyLocal() : {};
+
+        RADIO_NAMES.forEach(name => {
+            if (!d[name]) return;
+            const opt = document.querySelector(`input[name="${name}"][value="${d[name]}"]`);
+            if (opt) opt.checked = true;
+        });
+
+        ['age', 'livesYears', 'livestockYears'].forEach(id => {
+            if (d[id] != null) document.getElementById(id).value = d[id];
+        });
+
+        (d.livestock || []).forEach(v => {
+            const cb = document.querySelector(`input[name="livestock"][value="${v}"]`);
+            if (cb) cb.checked = true;
+        });
+
+        updateGate();
+    });
+
+    /** Save the demographics and consent, then move on to the first map. */
+    async function goNext() {
+        // Guard against a double tap firing two saves and two navigations.
+        nextBtn.disabled = true;
+
+        // Follow-ups are sent as null after a "no", even if something was
+        // typed before the answer was changed, so the data never claims years
+        // of livestock keeping from someone who said they keep none.
+        const lives = radioValue('livesHere') === 'yes';
+        const keeps = radioValue('keepsLivestock') === 'yes';
+
+        const answers = {
+            age:            numberValue('age'),
+            education:      radioValue('education'),
+            livesHere:      radioValue('livesHere'),
+            livesYears:     lives ? numberValue('livesYears') : null,
+            keepsLivestock: radioValue('keepsLivestock'),
+            livestockYears: keeps ? numberValue('livestockYears') : null,
+            livestock:      keeps ? checkValues('livestock') : []
+        };
+
+        // The local working copy pre-fills this page if the participant steps back.
+        const d = window.loadSurveyLocal ? window.loadSurveyLocal() : {};
+        Object.assign(d, answers);
+        d.timestamp = new Date().toISOString();
+        d.consent   = true;
+        if (window.saveSurveyLocal) window.saveSurveyLocal(d);
+
+        /* Wait only for the answers to be stored on the device — milliseconds —
+           not for them to reach the server, which happens in the background
+           whenever there is signal. */
+        if (window.saveMeta && window.settleWithin) {
+            await window.settleWithin(window.saveMeta({ ...answers, consent: true }));
+        }
+
+        window.location.href = 'map1.html';
+    }
+</script>
+</body>
+</html>

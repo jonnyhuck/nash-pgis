@@ -1,0 +1,774 @@
+/* ─────────────────────────────────────────────────────────────────
+   style.css  –  Ticks Mapping Survey
+
+   Mobile first throughout: every size below is chosen for a phone held
+   in one hand, and the layout simply centres itself on wider screens
+   rather than rearranging into a desktop design.
+   ───────────────────────────────────────────────────────────────── */
+
+/* Border-box sizing everywhere, so a padded element is the width it says
+   it is — without this, every width calculation below would need adjusting
+   for its own padding and border. */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+
+/* ── Palette ─────────────────────────────────────────────────────
+   Defined once as custom properties. One spray colour per map question,
+   matching the value given for the dots in that page's PAGE_CONFIG, so a
+   change of scheme means editing two files rather than ten rules. The
+   "-deep" pair are darker versions of the same hue, used only to tint the
+   question headings, where small text needs more contrast than a dot does. */
+:root {
+    /* University-ish blue, used for structure rather than for data. */
+    --primary:        #1a3f6f;
+    --primary-dark:   #122d52;
+    --primary-light:  #e8eef6;
+
+    /* Q1 — most ticks. Red. */
+    --ticks:          #dc2626;
+    --ticks-deep:     #b91c1c;
+
+    /* Q2 — no ticks. Blue. */
+    --no-ticks:       #2563eb;
+    --no-ticks-deep:  #1d4ed8;
+
+    /* Upload status line. */
+    --ok:             #15803d;
+    --warn:           #b45309;
+
+    /* Neutrals. */
+    --bg:             #f4f6f9;
+    --card:           #ffffff;
+    --border:         #dce1eb;
+    --text:           #1e293b;
+    --muted:          #64748b;
+
+    /* Shared shape and depth, so every panel matches without repetition. */
+    --radius:         10px;
+    --shadow:         0 2px 8px rgba(0,0,0,0.07);
+}
+
+
+/* ── Base ────────────────────────────────────────────────────────  */
+
+html {
+    /* 16px root, so every rem below is a predictable multiple of it. */
+    font-size: 16px;
+    /* Suppresses the grey flash iOS paints over every tapped element, which
+       on a page of buttons looks like a rendering fault. */
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    /* The system font stack: no web font to download, and the survey looks
+       native on whatever device it is opened on. */
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    /* Generous leading, because the information sheet is a wall of text. */
+    line-height: 1.5;
+}
+
+/* Caps the line length on a laptop and centres the survey; on a phone the
+   max-width simply never applies. */
+.page-container { max-width: 600px; margin: 0 auto; padding-bottom: 2rem; }
+
+/* Utility used by every element that is toggled from JavaScript. !important
+   because it must win over whatever display value the element already has. */
+.hidden { display: none !important; }
+
+
+/* ── Header ──────────────────────────────────────────────────────  */
+
+.site-header {
+    background: var(--primary);
+    color: #fff;
+    padding: 0.9rem 1.25rem;
+    text-align: center;
+}
+
+.site-title { font-size: 1.05rem; font-weight: 700; }
+
+/* The institution line is deliberately quiet: it establishes provenance
+   without competing with the survey title. */
+.institution {
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.8;
+    margin-bottom: 0.2rem;
+}
+
+
+/* ── Progress ────────────────────────────────────────────────────
+   Three steps. Knowing how much is left is what stops people abandoning
+   part-way through. */
+
+.progress-wrap {
+    background: var(--primary-dark);
+    padding: 0.55rem 1.25rem 0.4rem;
+}
+
+.progress-bar {
+    height: 5px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 3px;
+    /* Clips the fill to the rounded ends of the track. */
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #fff;
+    border-radius: 3px;
+    /* Animates if the width is ever changed from script. */
+    transition: width 0.4s;
+}
+
+.progress-label {
+    color: rgba(255,255,255,0.7);
+    font-size: 0.72rem;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* Upload status on the left, page number on the right, under the bar. */
+.progress-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-top: 0.3rem;
+}
+
+
+/* ── Upload status line ──────────────────────────────────────────
+   Filled in by api.js. A coloured dot does most of the work, so the field
+   team can tell at a glance whether a phone still holds unsent answers. */
+
+.sync-status {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.85);
+    line-height: 1.35;
+}
+
+.sync-status:empty { display: none; }
+
+.sync-status::before {
+    content: "";
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 0.4rem;
+    vertical-align: 0.05em;
+    background: #94a3b8;
+}
+
+.sync-status[data-state="ok"]::before   { background: #4ade80; }
+.sync-status[data-state="busy"]::before { background: #60a5fa; }
+.sync-status[data-state="wait"]::before { background: #fbbf24; }
+.sync-status[data-state="warn"]::before { background: #f87171; }
+
+/* The same line inside a white card, where it needs dark text and a box. */
+.sync-status-block {
+    color: var(--text) !important;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.85rem !important;
+    margin-top: 1rem;
+}
+.sync-status-block[data-state="ok"]   { border-color: var(--ok); }
+.sync-status-block[data-state="wait"],
+.sync-status-block[data-state="warn"] { border-color: var(--warn); }
+
+
+/* ── Cards ───────────────────────────────────────────────────────  */
+
+.content { padding: 1rem 1rem 0; }
+
+.card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.2rem;
+    margin-bottom: 0.9rem;
+    box-shadow: var(--shadow);
+}
+
+.card h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--primary);
+    /* The rule underneath separates heading from body without a second
+       background colour or an extra element. */
+    padding-bottom: 0.55rem;
+    margin-bottom: 0.8rem;
+    border-bottom: 2px solid var(--primary-light);
+}
+
+.card p { font-size: 0.93rem; margin-bottom: 0.65rem; line-height: 1.65; }
+
+/* No trailing gap inside the card. */
+.card p:last-child { margin-bottom: 0; }
+
+/* The anonymity promise, given a left bar so it reads as a standing
+   commitment rather than as one more paragraph. */
+.notice {
+    background: var(--primary-light);
+    border-left: 3px solid var(--primary);
+    border-radius: 0 6px 6px 0;
+    padding: 0.7rem 0.9rem;
+    font-size: 0.88rem !important;
+}
+
+
+/* ── Form controls ───────────────────────────────────────────────  */
+
+.form-group { margin-bottom: 1rem; }
+.form-group:last-child { margin-bottom: 0; }
+
+label.field-label {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin-bottom: 0.38rem;
+}
+
+input[type="text"],
+input[type="number"],
+select,
+textarea {
+    width: 100%;
+    /* Roomy padding: these are finger targets before they are text fields. */
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    /* 1rem exactly — iOS Safari zooms the whole page in on focus if an
+       input's text is any smaller than 16px. */
+    font-size: 1rem;
+    font-family: inherit;
+    color: var(--text);
+    background: #fff;
+    /* Strips the heavy native styling so the fields match each other. */
+    -webkit-appearance: none;
+    appearance: none;
+    transition: border-color 0.2s;
+}
+
+/* A visible focus state is required for keyboard use; the default outline is
+   replaced rather than simply removed. */
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+select {
+    /* The native arrow went with appearance:none, so it is redrawn here as an
+       inline SVG — no extra file to fetch. */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.9rem center;
+    /* Keeps the longest option clear of the arrow. */
+    padding-right: 2.4rem;
+}
+
+/* Vertical resize only: horizontal dragging would break the layout. */
+textarea { min-height: 90px; resize: vertical; }
+
+
+/* ── Radio and checkbox rows ─────────────────────────────────────
+   The whole row is the label, so the tap target is the full width of the
+   card rather than the 20px control itself. */
+
+.option-group { display: flex; flex-direction: column; gap: 0.45rem; }
+
+.option-row {
+    display: flex;
+    /* Top-aligned, so the control stays beside the first line of a long label
+       rather than floating in the middle of a wrapped paragraph. */
+    align-items: flex-start;
+    gap: 0.7rem;
+    padding: 0.7rem 0.9rem;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.18s, background 0.18s;
+    /* 48px is the usual minimum comfortable touch target. */
+    min-height: 48px;
+    /* Stops a double-tap selecting the label text instead of ticking the box. */
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.option-row:hover { border-color: var(--primary); background: var(--primary-light); }
+
+.option-row input[type="radio"],
+.option-row input[type="checkbox"] {
+    width: 20px; height: 20px;
+    /* Nudged down to sit on the text baseline. */
+    margin-top: 0.1rem;
+    /* Never squashed by a long label beside it. */
+    flex-shrink: 0;
+    accent-color: var(--primary);
+    cursor: pointer;
+    /* Undoes the shared input styling above, which does not suit a tickbox. */
+    padding: 0; border: none; background: none;
+}
+
+.option-row span { font-size: 0.93rem; line-height: 1.45; }
+
+/* The selected answer is outlined, not just its 20px radio, so the choice
+   is obvious at arm's length and in bright sunlight. */
+.option-row:has(input:checked) { border-color: var(--primary); background: var(--primary-light); }
+
+/* The consent row carries the most text and the most weight, so it is tinted
+   very slightly to set it apart from an ordinary option. */
+.consent-row { background: #fafbff; }
+.consent-row span { font-size: 0.88rem; }
+
+/* "For how long?" and the livestock list, revealed under a "Yes". Indented
+   with a rule, so it reads as part of the question above it. */
+.follow-up {
+    margin-top: 0.9rem;
+    padding-left: 0.9rem;
+    border-left: 3px solid var(--primary-light);
+}
+
+
+/* ── 0-10 confidence scale ───────────────────────────────────────
+   Eleven numbered tap targets in a row. Each one is the whole label, with
+   the radio itself hidden: at eleven across a phone, a visible 20px radio
+   plus its number would not fit, and the filled box is clearer anyway. */
+
+.scale-options {
+    display: flex;
+    gap: 0.2rem;
+}
+
+.scale-option {
+    flex: 1;
+    /* Without this, the two-digit "10" would make its box wider than the rest. */
+    min-width: 0;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.scale-option input {
+    /* Visually hidden but still focusable and announced by screen readers. */
+    position: absolute;
+    opacity: 0;
+    width: 1px; height: 1px;
+}
+
+.scale-option span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 44px;
+    border: 2px solid var(--border);
+    border-radius: 7px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--muted);
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.scale-option input:checked + span {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+.scale-option input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+
+/* ── Buttons ─────────────────────────────────────────────────────  */
+
+.btn {
+    /* inline-flex centres the label and any arrow glyph together. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.85rem 1.75rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    /* Comfortably above the 44px minimum for a primary action. */
+    min-height: 50px;
+    letter-spacing: 0.02em;
+    transition: background 0.18s, opacity 0.18s, transform 0.1s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* A press is confirmed by the button shrinking slightly — the only feedback
+   a touch device gives, since there is no hover state. */
+.btn:active { transform: scale(0.97); }
+
+/* Disabled buttons are dimmed and do not react to a press at all, so a
+   participant is never left wondering whether their tap registered. */
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:disabled:active { transform: none; }
+
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+
+.btn-secondary { background: #fff; color: var(--text); border: 2px solid var(--border); }
+.btn-secondary:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+
+/* PREV on the left, NEXT on the right, in the same place on every page. */
+.nav-buttons {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 1rem;
+    margin-top: 1.1rem;
+}
+
+/* Page 1 has no PREV, so its single button is pushed to the right to stay
+   where NEXT sits on every other page. */
+.nav-buttons.end { justify-content: flex-end; }
+
+/* The map pages fit a third button — SPRAY AGAIN — between PREV and NEXT.
+   Equal thirds rather than the two-button pair's natural width, and a
+   smaller side padding so "SPRAY AGAIN" fits one line on a narrow phone. */
+.nav-buttons-3 { gap: 0.5rem; }
+.nav-buttons-3 .btn { flex: 1; padding-left: 0.5rem; padding-right: 0.5rem; }
+
+
+/* ── Map pages ───────────────────────────────────────────────────  */
+
+.map-question { padding: 1rem 1rem 0.6rem; }
+
+.map-question h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--primary);
+}
+
+/* Each question is tinted to match the spray colour used to answer it, so
+   the link between the question and the paint is immediate. */
+.map-question.ticks    h2 { color: var(--ticks-deep); }
+.map-question.no-ticks h2 { color: var(--no-ticks-deep); }
+
+/* The subtext under each question's heading: present, but clearly
+   subordinate to the question itself. */
+.question-note {
+    margin-top: 0.45rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+/* How-to text. Quiet, because it is read once and then ignored. */
+.instructions {
+    margin: 0 1rem 0.7rem;
+    padding: 0.7rem 1rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.83rem;
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+/* Undo / Clear / Reset, sharing the width equally above the map. */
+.map-toolbar {
+    display: flex;
+    gap: 0.45rem;
+    margin: 0 1rem 0.5rem;
+}
+
+.tool-btn {
+    /* Equal thirds regardless of label length. */
+    flex: 1;
+    padding: 0.55rem 0.4rem;
+    border: 2px solid var(--border);
+    border-radius: 7px;
+    background: #fff;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    color: var(--text);
+    min-height: 42px;
+    transition: border-color 0.18s, color 0.18s, background 0.18s;
+}
+
+.tool-btn:hover { border-color: var(--primary); color: var(--primary); }
+.tool-btn:active { background: var(--primary-light); }
+
+.map-wrap { position: relative; margin: 0 1rem; }
+
+#map {
+    /* Viewport-relative, so the map fills the screen on a phone but is
+       bounded on a laptop, with a floor that keeps it usable on a small
+       device in landscape. */
+    height: 65vh;
+    min-height: 320px;
+    max-height: 560px;
+    border-radius: var(--radius);
+    border: 2px solid var(--border);
+    /* Clips the tiles to the rounded corners. */
+    overflow: hidden;
+    cursor: grab;
+    /* Shown wherever imagery has not been downloaded, so a gap in the
+       offline map reads as "no imagery" rather than as a broken page. */
+    background: #d6d3cc;
+}
+
+
+/* ── Spray colour buttons ────────────────────────────────────────  */
+
+.draw-modes {
+    display: flex;
+    gap: 0.6rem;
+    margin: 0.7rem 1rem 0;
+}
+
+.draw-btn {
+    /* One button per map, spanning the full width of the row. */
+    flex: 1;
+    display: flex;
+    /* Stacked: the label on top, the tap hint underneath. */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    padding: 0.8rem 0.5rem;
+    /* Transparent border reserved at full width, so the coloured border added
+       below cannot shift the layout when it appears. */
+    border: 2.5px solid transparent;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: center;
+    min-height: 52px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    transition: all 0.2s;
+}
+
+/* The swatch and the button's name, kept on one line together while the
+   hint below them forms the second line of the stack. */
+.draw-label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+/* A dot of the actual paint colour, so the button is identifiable by colour
+   as well as by its label. */
+.draw-btn .swatch {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    /* A faint ring keeps the pale swatches visible on a pale button. */
+    border: 2px solid rgba(0,0,0,0.25);
+}
+
+/* The armed state: an inset shadow and a ring in the button's own colour,
+   which is the only signal that a finger drag will now paint rather than pan. */
+.draw-btn.active {
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.18), 0 0 0 3px currentColor;
+}
+
+/* The button is a toggle, so it states what the next tap will do — in both
+   states. Neither half of that is discoverable on its own: an unlabelled
+   button gives no reason to press it, and getting stuck in spray mode with
+   no way back to panning is the one way to be properly lost. */
+.draw-btn::after {
+    content: "tap to start";
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.7;
+}
+
+/* Same line, opposite instruction, once the can is in hand. Because the hint
+   is present either way, the button does not change height when it is armed. */
+.draw-btn.active::after { content: "tap to stop"; }
+
+/* Q1 — most ticks. Pale tint, saturated border, deep text: enough contrast
+   to read, while the button still clearly belongs to its colour family. Q2
+   follows the same recipe in its own hue. */
+.btn-draw-ticks {
+    background: rgba(220,38,38,0.10);
+    color: #991b1b;
+    border-color: var(--ticks);
+}
+.btn-draw-ticks.active, .btn-draw-ticks:hover {
+    background: rgba(220,38,38,0.22);
+    border-color: #991b1b;
+}
+.btn-draw-ticks .swatch { background: var(--ticks); }
+
+/* Q2 — no ticks. */
+.btn-draw-no_ticks {
+    background: rgba(37,99,235,0.10);
+    color: #1e40af;
+    border-color: var(--no-ticks);
+}
+.btn-draw-no_ticks.active, .btn-draw-no_ticks:hover {
+    background: rgba(37,99,235,0.22);
+    border-color: #1e40af;
+}
+.btn-draw-no_ticks .swatch { background: var(--no-ticks); }
+
+
+/* ── Places count ─────────────────────────────────────────────────
+   A quiet running total ("2 places added") beneath the draw button, so the
+   participant has some feedback that "Spray again" is actually accumulating
+   places rather than just resetting the map. */
+.places-count {
+    margin: 0.6rem 1rem 0;
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-align: center;
+}
+
+
+/* ── Follow-up sheet ─────────────────────────────────────────────
+   A bottom sheet rather than a centred dialogue: it rises into the
+   half of the screen a thumb can actually reach. */
+
+.modal-overlay {
+    position: fixed;
+    /* Covers the viewport, so the map cannot be painted while it is open. */
+    inset: 0;
+    background: rgba(15,23,42,0.55);
+    /* Above everything, Leaflet's controls included. */
+    z-index: 2000;
+    display: flex;
+    /* Bottom-aligned: this is what makes it a sheet rather than a dialogue. */
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.modal-sheet {
+    background: var(--card);
+    /* Rounded at the top only — the bottom edge is off-screen. */
+    border-radius: 16px 16px 0 0;
+    /* The safe-area inset clears the home indicator on a modern iPhone. */
+    padding: 1.4rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom, 0px));
+    width: 100%;
+    max-width: 600px;
+    /* Capped and scrollable, so an on-screen keyboard cannot push the
+       buttons out of reach. */
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.18);
+}
+
+.modal-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--primary);
+    padding-bottom: 0.6rem;
+    margin-bottom: 0.9rem;
+    border-bottom: 2px solid var(--primary-light);
+}
+
+/* Questions on the sheet are a little more spaced than on the main pages,
+   since each one is answered for every area marked. */
+.modal-sheet .form-group { margin-bottom: 1.2rem; }
+
+/* Anchors the 0-10 scale: without these the numbers alone say nothing
+   about which end means what. */
+.scale-endpoints {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.73rem;
+    color: var(--muted);
+    margin-top: 0.3rem;
+}
+
+
+/* ── Thank you ───────────────────────────────────────────────────  */
+
+.thankyou-card {
+    text-align: center;
+    padding: 2rem 1.5rem;
+    margin: 1rem 1rem 0;
+}
+
+/* The tick is a text glyph in a circle: no icon font, no image request. */
+.thankyou-card .tick {
+    width: 64px; height: 64px;
+    background: var(--primary-light);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 1rem;
+    font-size: 2rem;
+}
+
+.thankyou-card h2 { font-size: 1.4rem; color: var(--primary); margin-bottom: 0.65rem; }
+.thankyou-card p { font-size: 0.93rem; color: var(--muted); margin-bottom: 0.5rem; }
+
+
+/* ── Field setup page ────────────────────────────────────────────  */
+
+/* The discreet way in, at the foot of the start and thank-you pages. */
+.setup-link {
+    text-align: center;
+    margin-top: 1.5rem;
+    font-size: 0.78rem;
+}
+.setup-link a { color: var(--muted); }
+
+/* The .btn look on a link, for "Go to survey". */
+a.btn { text-decoration: none; }
+
+.btn-small { padding: 0.6rem 1rem; min-height: 42px; font-size: 0.85rem; }
+
+/* A row of buttons that wraps onto a second line on a narrow phone. */
+.button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.7rem;
+}
+
+/* A file input dressed as a button: the real control is invisible and
+   stretched over the label, so a tap anywhere on it opens the picker. */
+.file-btn { position: relative; overflow: hidden; }
+.file-btn input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.check-list {
+    list-style: none;
+    margin: 0.4rem 0 0.6rem;
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+.check-list li { padding: 0.2rem 0; }
+.check-list li[data-ok="yes"] { color: var(--ok); }
+.check-list li[data-ok="no"]  { color: var(--warn); font-weight: 600; }
+
+#map.setup-map { height: 55vh; min-height: 280px; }
+
+.estimate { font-size: 0.85rem; color: var(--muted); margin-top: 0.4rem; }
+
+.dl-bar {
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 0.7rem;
+}
+.dl-fill { height: 100%; width: 0; background: var(--primary); transition: width 0.3s; }
